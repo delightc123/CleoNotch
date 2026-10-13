@@ -35,9 +35,9 @@ const hexToRgb = (hex: string): [number, number, number] => {
 };
 
 const detailToSteps = (detail: string) => {
-  if (detail === "low") return 36.0;
-  if (detail === "high") return 80.0;
-  return 50.0;
+  if (detail === "low") return 40.0;
+  if (detail === "high") return 110.0;
+  return 70.0;
 };
 
 const vertex = `#version 300 es
@@ -271,21 +271,23 @@ const createWaveRenderer = (container: HTMLDivElement) => {
   return { renderer, gl, canvas };
 };
 
-const bindPointerTracking = (canvas: HTMLCanvasElement, targetMouse: [number, number]) => {
+const bindPointerTracking = (container: HTMLDivElement, targetMouse: [number, number]) => {
   const onPointerMove = (e: PointerEvent) => {
-    const rect = canvas.getBoundingClientRect();
-    targetMouse[0] = (e.clientX - rect.left) / rect.width;
-    targetMouse[1] = 1.0 - (e.clientY - rect.top) / rect.height;
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      targetMouse[0] = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      targetMouse[1] = Math.max(0, Math.min(1, 1.0 - (e.clientY - rect.top) / rect.height));
+    }
   };
   const onPointerLeave = () => {
     targetMouse[0] = 0.5;
     targetMouse[1] = 0.5;
   };
-  canvas.addEventListener("pointermove", onPointerMove);
-  canvas.addEventListener("pointerleave", onPointerLeave);
+  window.addEventListener("pointermove", onPointerMove, { passive: true });
+  window.addEventListener("blur", onPointerLeave);
   return () => {
-    canvas.removeEventListener("pointermove", onPointerMove);
-    canvas.removeEventListener("pointerleave", onPointerLeave);
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("blur", onPointerLeave);
   };
 };
 
@@ -371,7 +373,7 @@ const mountWaveRenderer = (
   setSize();
 
   const currentMouse: [number, number] = [0.5, 0.5], targetMouse: [number, number] = [0.5, 0.5];
-  const unbindPointer = bindPointerTracking(canvas, targetMouse);
+  const unbindPointer = bindPointerTracking(container, targetMouse);
   const t0 = performance.now();
 
   const loop = (t: number) => {
@@ -414,26 +416,26 @@ const mountWaveRenderer = (
 };
 
 const DEFAULT_WAVE_CONFIG: WaveConfig = {
-  horizonColor: "#2E28D4",
-  waveColor: "#EC4899",
-  crestColor: "#FB7185",
-  speed: 0.12,
-  amplitude: 1.8,
-  waveScale: 0.55,
-  waveRatio: 0.85,
-  swell: 22,
-  turbulence: 12,
+  horizonColor: "#5227FF",
+  waveColor: "#FF9FFC",
+  crestColor: "#FFFFFF",
+  speed: 0.4,
+  amplitude: 2.5,
+  waveScale: 0.6,
+  waveRatio: 0.9,
+  swell: 35,
+  turbulence: 20,
   tilt: 1.11,
   zoom: 1.0,
-  height: 5.8,
-  fogDepth: 16,
+  height: 5.5,
+  fogDepth: 15,
   detail: "medium",
-  brightness: 0.95,
-  opacity: 0.9,
+  brightness: 1.0,
+  opacity: 1.0,
   mouseInteraction: true,
-  parallaxStrength: 0.25,
+  parallaxStrength: 0.5,
   grain: true,
-  grainIntensity: 0.025
+  grainIntensity: 0.05
 };
 
 const GradientWaves: React.FC<GradientWavesProps> = (props) => {

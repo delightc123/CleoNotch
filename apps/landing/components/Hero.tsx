@@ -189,11 +189,11 @@ export function Hero({ isReady = true, onEntranceComplete }: HeroProps) {
         initial={{ opacity: 0, scale: 0.7 }}
         animate={
           isReady
-            ? { opacity: 0.35, scale: 1.15 }
+            ? { opacity: 0.15, scale: 1.15 }
             : { opacity: 0.95, scale: 1.0 }
         }
         transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
-        className="pointer-events-none absolute -inset-x-16 -inset-y-12 -z-10 rounded-full bg-gradient-to-r from-[#2E28D4]/60 via-[#8B5CF6]/50 to-[#EC4899]/60 blur-[90px]"
+        className="pointer-events-none absolute -inset-x-16 -inset-y-12 -z-10 rounded-full bg-gradient-to-r from-[#5227FF]/40 via-[#8B5CF6]/30 to-[#FF9FFC]/35 blur-[90px]"
       />
 
       {/* Main Header — Types out "Hey Cleo!" with mechanical sound and liquid glass refraction */}

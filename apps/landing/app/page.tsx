@@ -38,34 +38,34 @@ export default function HomePage() {
       {/* Arc Ambient Mesh Glow Orbs (Behind Waves) */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         {/* Cool Cobalt/Indigo Glow (Top-Left) */}
-        <div className="absolute -top-[15%] -left-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#2E28D4]/18 blur-[140px]" />
+        <div className="absolute -top-[15%] -left-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#5227FF]/15 blur-[140px]" />
         {/* Hot Magenta/Pink Glow (Bottom-Right) */}
-        <div className="absolute -bottom-[15%] -right-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#EC4899]/15 blur-[140px]" />
+        <div className="absolute -bottom-[15%] -right-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#FF9FFC]/12 blur-[140px]" />
       </div>
 
-      {/* Background: WebGL2 GradientWaves tuned to Arc Brand Palette */}
+      {/* Background: WebGL2 GradientWaves component from React Bits */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <GradientWaves
-          horizonColor="#2E28D4"
-          waveColor="#EC4899"
-          crestColor="#FB7185"
-          speed={0.12}
-          amplitude={1.8}
-          waveScale={0.55}
-          waveRatio={0.85}
-          swell={22}
-          turbulence={12}
+          horizonColor="#5227FF"
+          waveColor="#FF9FFC"
+          crestColor="#FFFFFF"
+          speed={0.4}
+          amplitude={2.5}
+          waveScale={0.6}
+          waveRatio={0.9}
+          swell={35}
+          turbulence={20}
           tilt={1.11}
           zoom={1.0}
-          height={5.8}
-          fogDepth={16}
+          height={5.5}
+          fogDepth={15}
           detail="medium"
-          brightness={0.95}
-          opacity={0.9}
+          brightness={1.0}
+          opacity={1.0}
           mouseInteraction={true}
-          parallaxStrength={0.25}
+          parallaxStrength={0.5}
           grain={true}
-          grainIntensity={0.025}
+          grainIntensity={0.05}
         />
       </div>
 
