@@ -2,16 +2,17 @@
 
 <div align="center">
 
-<img src="NotchBuddy/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="CleoNotch icon">
+<img src="apps/desktop-mac/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="CleoNotch icon">
 
 **An intelligent on-screen companion that lives in your Mac's notch — or at the top of your screen on Windows and Linux — keeping an eye on your AI coding agent sessions.**
 
-[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](NotchBuddy/)
-[![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)](windows/)
-[![Linux](https://img.shields.io/badge/Linux-AppImage%20%7C%20deb%20%7C%20rpm-FCC624?logo=linux&logoColor=black)](windows/)
-[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](NotchBuddy/)
-[![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0A84FF)](NotchBuddy/)
-[![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black)](windows/)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](apps/desktop-mac/)
+[![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)](apps/desktop-windows/)
+[![Linux](https://img.shields.io/badge/Linux-AppImage%20%7C%20deb%20%7C%20rpm-FCC624?logo=linux&logoColor=black)](apps/desktop-linux/)
+[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](apps/desktop-mac/)
+[![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0A84FF)](apps/desktop-mac/)
+[![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black)](apps/desktop-windows/)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-000?logo=nextdotjs&logoColor=white)](apps/landing/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <img src="docs/media/demo.gif" width="760" alt="CleoNotch in action">
@@ -81,52 +82,138 @@ CleoNotch is engineered with a dual-engine architecture optimized for native pla
 
 ---
 
-## Installation & Setup
+## Monorepo Architecture
 
-### macOS Installation
+CleoNotch is organized as a high-performance **pnpm + Turborepo monorepo** matching modern production standards:
 
-1. Download the latest release from the [Releases](https://github.com/delightc123/CleoNotch/releases) section.
-2. Unpack `CleoNotch.zip` and move `CleoNotch.app` to your `/Applications` directory.
-3. Launch the application and grant accessibility permissions when prompted.
-
-### Windows & Linux (Tauri Engine)
-
-On Windows and Linux displays lacking a physical camera notch, CleoNotch docks unobtrusively along the top border of your screen:
-- **Windows**: Install the `.exe` installer or build from source via `windows/`.
-- **Linux**: Available as AppImage, `.deb`, and `.rpm` packages supporting Wayland compositors (COSMIC, KDE Plasma, Hyprland, Sway) and X11.
+```
+CleoNotch/
+  apps/
+    desktop-windows/   # Unified Tauri v2 + Rust engine (Windows & Linux HUD)
+    desktop-mac/       # Native Swift 6 + SwiftUI companion (macOS notch)
+    desktop-linux/     # Linux packaging (AppImage, .deb, .rpm, PKGBUILD)
+    landing/           # Next.js 16 interactive web app (heycleo.vercel.app)
+    docs/              # Static documentation & API guides
+    relay/             # Cloudflare Worker for cross-device state relay
+  packages/            # Shared configs, design tokens, outfits
+  scripts/             # Sync engine (sync-coucou.mjs), outfit renderers
+```
 
 ---
 
-## Building from Source
+## 🛠️ Local Developer Testing & Execution Guide (Windows)
+
+You can run and test Cleo in three distinct modes depending on what you are testing:
+
+### Method 1: Rapid In-Browser UI Testing (`pnpm run dev` or `pnpm dev:ui`)
+
+When designing UI layouts, tweaking CSS styles, or testing Mochi's Canvas 2D expressions and animations without compiling Rust or spawning OS windows:
+
+```powershell
+# From root repository:
+pnpm dev:ui
+
+# Or inside apps/desktop-windows:
+cd apps/desktop-windows
+pnpm run dev
+```
+
+- **Interactive HUD Canvas**: Open [http://localhost:1420](http://localhost:1420) to view the notch UI with instant Hot Module Replacement (HMR).
+- **Settings Panel Parity**: Open [http://localhost:1420/settings.html](http://localhost:1420/settings.html) to test settings without native Tauri.
+- **File Drop Choreography Preview**: Open [http://localhost:1420/dev/upload-preview.html](http://localhost:1420/dev/upload-preview.html) to view Mochi's file swallowing animation on a loop.
+
+---
+
+### Method 2: Native Desktop HUD Dev Mode (`pnpm tauri dev` or `pnpm dev:desktop`)
+
+This runs the full native Tauri v2 desktop application with live hot-reloading: a transparent, non-activating always-on-top window docked to the top bezel, Mochi interactive Canvas 2D mascot, system tray icon, and live Win32 Named Pipe listener (`\\.\pipe\cleo`).
+
+```powershell
+# From root repository:
+pnpm dev:desktop
+
+# Or inside apps/desktop-windows:
+cd apps/desktop-windows
+pnpm tauri dev
+```
+
+**What this does**:
+1. Automatically executes `predev` (`cargo build --release -p cleo-hook`) to compile the external agent relay.
+2. Compiles the Rust backend (`src-tauri/`) in debug mode and mounts the transparent desktop HUD.
+3. Initializes the named pipe server on `\\.\pipe\cleo-<SID>` (with fallback listening on `\\.\pipe\coucou-<SID>`).
+4. Mounts the Mochi icon into the Windows Notification Area (System Tray).
+
+---
+
+### Method 3: Production Local Build & Test (`pnpm tauri build` or `pnpm pack:windows`)
+
+This compiles the exact release artifact—a fully optimized standalone executable (`cleonotch.exe`) and Windows installer (`Cleo-Windows.msi` / `Cleo-Windows-setup.exe`) identical to official distributed releases.
+
+```powershell
+# From root repository:
+pnpm build:desktop      # Compiles standalone release binary in target/release/
+pnpm pack:windows       # Generates MSI & NSIS installer in apps/desktop-windows/release/
+
+# Or inside apps/desktop-windows:
+cd apps/desktop-windows
+pnpm tauri build        # Generates standalone cleonotch.exe & bundle installers
+pnpm pack               # Bundles installers into apps/desktop-windows/release/
+```
+
+**Output Artifacts**:
+- **Standalone Portable App**: `apps/desktop-windows/target/release/cleonotch.exe` (Run immediately by double-clicking!)
+- **Windows MSI Installer**: `apps/desktop-windows/release/Cleo-Windows.msi`
+- **Windows Setup Installer**: `apps/desktop-windows/release/Cleo-Windows-setup.exe`
+
+---
+
+### Testing Agent Hooks & IPC
+
+To simulate external coding agents (Claude Code, Cursor, Codex) sending commands into Cleo while it is running:
+
+```powershell
+# Test via the compiled agent relay
+.\apps\desktop-windows\target\release\cleo-hook.exe notification '{"title":"Agent Ready","message":"Claude Code connected to Cleo!"}'
+```
+
+---
+
+## 🌐 Interactive Web Landing Page (`apps/landing`)
+
+Cleo's official web landing page is built with Next.js 16 (Turbopack), Tailwind CSS v4, Framer Motion, and `@animateicons/react`. It features a live in-browser notch simulator, procedural Web Audio synthesizer, and animated icons.
+
+- **Live Production URL**: [https://heycleo.vercel.app](https://heycleo.vercel.app)
+- **Local Development**:
+  ```powershell
+  pnpm dev:landing       # Runs Next.js at http://localhost:3000
+  pnpm build:landing     # Verifies Next.js Turbopack production build
+  ```
+
+---
+
+## Building from Source (All Platforms)
 
 ### macOS (Swift 6 & Xcode)
 
 **Prerequisites**: macOS 15+, Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```bash
-# Clone the repository
 git clone https://github.com/delightc123/CleoNotch.git
-cd CleoNotch/NotchBuddy
-
-# Generate the Xcode project and build
+cd CleoNotch/apps/desktop-mac
 xcodegen
 open NotchBuddy.xcodeproj   # Press ⌘R to run
 ```
 
-### Windows (Tauri v2 & Rust)
-
-**Prerequisites**: [Rust toolchain](https://rustup.rs), Node.js 20+, MSVC build tools.
+### Windows & Linux Packaged Release
 
 ```powershell
-git clone https://github.com/delightc123/CleoNotch.git
-cd CleoNotch/windows
-npm install
-npm run pack                # Output artifact generated in windows/release/
+# Windows MSI and EXE installers
+cd apps/desktop-windows
+pnpm install
+pnpm pack                # Output artifact generated in apps/desktop-windows/release/
 ```
 
 ### Linux (WebKitGTK & GTK Layer Shell)
-
-**Prerequisites**: Rust, Node.js 20+, GTK Layer Shell, and WebKit2GTK libraries.
 
 ```bash
 sudo apt update && sudo apt install -y build-essential pkg-config \
@@ -134,10 +221,9 @@ sudo apt update && sudo apt install -y build-essential pkg-config \
   librsvg2-dev libssl-dev libdbus-1-dev patchelf \
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good
 
-git clone https://github.com/delightc123/CleoNotch.git
-cd CleoNotch/windows
-npm install
-npm run pack
+cd apps/desktop-windows
+pnpm install
+pnpm pack
 ```
 
 ---

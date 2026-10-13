@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cleo — Desktop Entrance Animation Testbench</title>
+    <style>
+      :root {
+        --bg: #090a0f;
+        --hud-bg: rgba(18, 19, 26, 0.85);
+        --hud-border: rgba(255, 255, 255, 0.1);
+        --text: #f5f6f8;
+        --dim: #9398a1;
+        --cobalt: #2e28d4;
+        --magenta: #ec4899;
+        --lilac: #8b5cf6;
+        --coral: #fb7185;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+      }
+
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+      }
+
+      #viewport-container {
+        position: relative;
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: radial-gradient(circle at 50% 50%, #11131c 0%, #08090d 100%);
+      }
+
+      #sim-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      /* Fake notch placeholder at top to demonstrate final resting place */
+      #notch-preview {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 240px;
+        height: 14px;
+        background: #000;
+        border-radius: 0 0 14px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-top: none;
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 10;
+        pointer-events: none;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #notch-preview.expanded {
+        width: 640px;
+        height: 150px;
+        background: linear-gradient(135deg, #131422 0%, #17141f 50%, #20131e 100%);
+        border-radius: 0 0 20px 20px;
+        border: none;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.8), 0 0 30px rgba(46, 40, 212, 0.25);
+      }
+
+      #notch-preview.compact-settled {
+        width: 288px;
+        height: 35px;
+        background: #000;
+        border-radius: 0 0 14px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-top: none;
+      }
+
+      /* Control HUD console */
+      #hud {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100% - 48px);
+        max-width: 980px;
+        background: var(--hud-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--hud-border);
+        border-radius: 16px;
+        padding: 14px 20px;
+        z-index: 50;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .hud-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .timeline-box {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+      }
+
+      .timeline-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .phase-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: rgba(139, 92, 246, 0.15);
+        color: #c4b5fd;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        font-weight: 500;
+        letter-spacing: 0.3px;
+      }
+
+      .time-counter {
+        font-weight: 600;
+        color: #fff;
+      }
+
+      /* Custom Range Scrubber */
+      input[type="range"].scrubber {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        outline: none;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      input[type="range"].scrubber:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      input[type="range"].scrubber::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 0 10px rgba(236, 72, 153, 0.8), 0 2px 5px rgba(0, 0, 0, 0.5);
+        cursor: grab;
+        border: 2px solid var(--magenta);
+      }
+
+      input[type="range"].scrubber::-webkit-slider-thumb:active {
+        cursor: grabbing;
+        transform: scale(1.15);
+      }
+
+      .btn-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--text);
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.12s ease;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.25);
+      }
+
+      .btn:active {
+        transform: scale(0.96);
+      }
+
+      .btn.primary {
+        background: linear-gradient(135deg, var(--cobalt), var(--magenta));
+        border-color: transparent;
+        color: #fff;
+        font-weight: 600;
+      }
+
+      .btn.primary:hover {
+        filter: brightness(1.1);
+      }
+
+      .btn.active {
+        background: rgba(236, 72, 153, 0.25);
+        border-color: var(--magenta);
+        color: #fff;
+      }
+
+      .params-drawer {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        font-size: 12px;
+        color: var(--dim);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding-top: 10px;
+      }
+
+      .param-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .param-item input[type="range"] {
+        width: 80px;
+      }
+
+      /* Keyboard hint badge */
+      .kbd {
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        font-size: 11px;
+        color: #bbb;
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewport-container">
+      <canvas id="sim-canvas"></canvas>
+      <div id="notch-preview"></div>
+    </div>
+
+    <!-- Interactive HUD Testbench Console -->
+    <div id="hud">
+      <div class="timeline-box">
+        <div class="timeline-header">
+          <div class="phase-badge" id="phase-badge">
+            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#ec4899;"></span>
+            <span id="phase-label">Phase 1: Orb Emergence</span>
+          </div>
+          <div class="time-counter">
+            <span id="time-display">0.00s</span> / <span>7.80s</span>
+          </div>
+        </div>
+        <input type="range" class="scrubber" id="scrubber" min="0" max="7.8" step="0.01" value="0" />
+      </div>
+
+      <div class="hud-row">
+        <div class="btn-group">
+          <button class="btn primary" id="btn-play">
+            <span id="play-icon">▶</span> <span id="play-text">Play</span> <span class="kbd">Space</span>
+          </button>
+          <button class="btn" id="btn-restart">
+            ↺ Restart <span class="kbd">R</span>
+          </button>
+          <button class="btn" id="btn-prev">-0.1s</button>
+          <button class="btn" id="btn-next">+0.1s</button>
+        </div>
+
+        <div class="btn-group">
+          <span style="font-size: 12px; color: var(--dim);">Speed:</span>
+          <button class="btn" data-speed="0.25">0.25x</button>
+          <button class="btn" data-speed="0.5">0.5x</button>
+          <button class="btn active" data-speed="1.0">1.0x</button>
+          <button class="btn" data-speed="2.0">2.0x</button>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn" id="btn-sound">
+            <span id="sound-icon">🔊</span> Audio: <span id="sound-state">ON</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="params-drawer">
+        <div class="param-item">
+          <span>Orb Wobble:</span>
+          <input type="range" id="param-wobble" min="0.05" max="0.4" step="0.02" value="0.18" />
+          <span id="val-wobble">0.18</span>
+        </div>
+        <div class="param-item">
+          <span>Suction Strength:</span>
+          <input type="range" id="param-suction" min="0.5" max="2.0" step="0.1" value="1.0" />
+          <span id="val-suction">1.0x</span>
+        </div>
+        <div class="param-item" style="margin-left: auto;">
+          <span>Status:</span>
+          <span id="status-desc" style="color: #60a5fa;">Interactive Simulation Active</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ── Web Audio Synth (Keystrokes, Chimes & Suction) ──────────────────────
+      let audioCtx = null;
+      let soundEnabled = true;
+
+      function getAudioContext() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (audioCtx && audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+        return audioCtx;
+      }
+
+      function playKeystrokeClick() {
+        if (!soundEnabled) return;
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(450 + Math.random() * 140, now);
+        osc.frequency.exponentialRampToValueAtTime(100, now + 0.035);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.035);
+      }
+
+      function playChime(freqs = [587.33, 880.0, 1174.66]) {
+        if (!soundEnabled) return;
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        freqs.forEach((freq, i) => {
+          const now = ctx.currentTime + i * 0.07;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.7);
+        });
+      }
+
+      function playSuctionWhoosh() {
+        if (!soundEnabled) return;
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.6);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.16, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.65);
+      }
+
+      // ── Math & Interpolation Utilities ──────────────────────────────────────
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+
+      const Ease = {
+        out: (t) => 1 - Math.pow(1 - t, 3),
+        inOut: (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+        back: (t) => {
+          const c1 = 1.7;
+          const c3 = c1 + 1;
+          return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+        },
+      };
+
+      // ── Animation State & Elements ──────────────────────────────────────────
+      const canvas = document.getElementById("sim-canvas");
+      const ctx = canvas.getContext("2d");
+      const notchPreview = document.getElementById("notch-preview");
+
+      const scrubber = document.getElementById("scrubber");
+      const timeDisplay = document.getElementById("time-display");
+      const phaseBadge = document.getElementById("phase-badge");
+      const phaseLabel = document.getElementById("phase-label");
+      const statusDesc = document.getElementById("status-desc");
+      const btnPlay = document.getElementById("btn-play");
+      const playIcon = document.getElementById("play-icon");
+      const playText = document.getElementById("play-text");
+      const btnRestart = document.getElementById("btn-restart");
+      const btnPrev = document.getElementById("btn-prev");
+      const btnNext = document.getElementById("btn-next");
+      const btnSound = document.getElementById("btn-sound");
+      const soundState = document.getElementById("sound-state");
+      const soundIcon = document.getElementById("sound-icon");
+
+      const paramWobble = document.getElementById("param-wobble");
+      const valWobble = document.getElementById("val-wobble");
+      const paramSuction = document.getElementById("param-suction");
+      const valSuction = document.getElementById("val-suction");
+
+      let width = window.innerWidth;
+      let height = window.innerHeight;
+      let dpr = window.devicePixelRatio || 1;
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      // Timeline controller
+      const TOTAL_DURATION = 7.8;
+      let currentTime = 0;
+      let isPlaying = true;
+      let playSpeed = 1.0;
+      let lastRafTime = performance.now();
+
+      // Sound triggers tracking to avoid repeating audio while scrubbing
+      let lastCharCount = 0;
+      let suctionSoundPlayed = false;
+      let greetingChimePlayed = false;
+
+      // ── Mochi Vector Canvas Renderer ────────────────────────────────────────
+      function drawMochiAvatar(ctx, x, y, scale = 1.0, waveAmount = 0, opacity = 1.0) {
+        if (opacity <= 0.01) return;
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+
+        const hb = 68; // height base
+        const hh = hb / 2;
+        const hw = hh * 1.34;
+
+        // Soft Radial Aura behind Mochi
+        const auraGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, hw * 2.8);
+        auraGrad.addColorStop(0, "rgba(236, 72, 153, 0.28)");
+        auraGrad.addColorStop(0.5, "rgba(46, 40, 212, 0.16)");
+        auraGrad.addColorStop(1, "rgba(46, 40, 212, 0)");
+        ctx.fillStyle = auraGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, hw * 2.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Left Waving Hand
+        if (waveAmount > 0) {
+          ctx.save();
+          const waveAngle = Math.sin(currentTime * 12) * 0.42 * waveAmount;
+          const handX = -hw - 12;
+          const handY = -4 + Math.cos(currentTime * 12) * 6 * waveAmount;
+          ctx.translate(handX, handY);
+          ctx.rotate(waveAngle);
+          ctx.fillStyle = "rgb(251, 251, 252)";
+          ctx.beginPath();
+          ctx.arc(0, 0, 11, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Right Hand (Resting)
+        ctx.save();
+        ctx.translate(hw + 4, 12);
+        ctx.fillStyle = "rgb(238, 240, 243)";
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 9, 13, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Mochi Ears
+        [-hw * 0.52, hw * 0.52].forEach((earX) => {
+          ctx.save();
+          ctx.translate(earX, -hh - 1);
+          ctx.fillStyle = "rgb(245, 246, 248)";
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 7.5, 9.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0, 0, 0, 0.06)";
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // Mochi Body Squircle
+        ctx.save();
+        const r = hh * 0.72;
+        ctx.beginPath();
+        ctx.roundRect(-hw, -hh, hw * 2, hh * 2, [r, r, r * 0.85, r * 0.85]);
+        const bodyGrad = ctx.createLinearGradient(0, -hh, 0, hh);
+        bodyGrad.addColorStop(0, "rgb(255, 255, 255)");
+        bodyGrad.addColorStop(0.7, "rgb(240, 242, 246)");
+        bodyGrad.addColorStop(1, "rgb(215, 218, 226)");
+        ctx.fillStyle = bodyGrad;
+        ctx.fill();
+        ctx.restore();
+
+        // Rosy Cheeks (Blush)
+        [-hw * 0.5, hw * 0.5].forEach((cheekX) => {
+          ctx.save();
+          ctx.fillStyle = "rgba(244, 114, 182, 0.35)";
+          ctx.beginPath();
+          ctx.arc(cheekX, 4, 6.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+
+        // Eyes
+        [-hw * 0.35, hw * 0.35].forEach((eyeX) => {
+          ctx.save();
+          ctx.translate(eyeX, -3);
+          ctx.fillStyle = "#16171b";
+          ctx.beginPath();
+          ctx.roundRect(-3.5, -6, 7, 12, 3.5);
+          ctx.fill();
+          // Specular eye glint
+          ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+          ctx.beginPath();
+          ctx.arc(1.5, -3, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+
+        ctx.restore();
+      }
+
+      // ── Fluid Organic Harmonic Spline Orb ───────────────────────────────────
+      function drawFluidOrb(ctx, cx, cy, baseRadius, time, distortionAmp, alpha) {
+        if (alpha <= 0.005 || baseRadius <= 1) return;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+
+        const N = 18; // Control points
+        const points = [];
+
+        for (let i = 0; i < N; i++) {
+          const theta = (i / N) * Math.PI * 2;
+          // Harmonic wave equation for organic wobble
+          const wobble =
+            1.0 +
+            distortionAmp * Math.sin(3 * theta + time * 1.5) +
+            (distortionAmp * 0.65) * Math.cos(5 * theta + time * 0.9) +
+            (distortionAmp * 0.4) * Math.sin(2 * theta - time * 0.7);
+          const r = baseRadius * wobble;
+          points.push({
+            x: cx + r * Math.cos(theta),
+            y: cy + r * Math.sin(theta),
+          });
+        }
+
+        // Draw smooth closed spline
+        ctx.beginPath();
+        for (let i = 0; i < N; i++) {
+          const curr = points[i];
+          const next = points[(i + 1) % N];
+          const midX = (curr.x + next.x) / 2;
+          const midY = (curr.y + next.y) / 2;
+          if (i === 0) {
+            const prev = points[N - 1];
+            ctx.moveTo((prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
+          }
+          ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+        }
+        ctx.closePath();
+
+        // Signature Arc Brand Palette Gradient
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseRadius * 1.2);
+        grad.addColorStop(0, "rgba(46, 40, 212, 0.95)");   // Electric Cobalt
+        grad.addColorStop(0.35, "rgba(236, 72, 153, 0.88)"); // Hot Magenta
+        grad.addColorStop(0.65, "rgba(139, 92, 246, 0.75)"); // Luminous Lilac
+        grad.addColorStop(0.85, "rgba(251, 113, 133, 0.65)"); // Coral Rose
+        grad.addColorStop(1.0, "rgba(46, 40, 212, 0)");     // Fade to edge
+
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      // ── Main Simulation Render Loop ─────────────────────────────────────────
+      function renderFrame(t) {
+        ctx.clearRect(0, 0, width, height);
+
+        const cx = width / 2;
+        const cy = height / 2;
+        const screenDiag = Math.hypot(width, height);
+        const wobbleParam = parseFloat(paramWobble.value);
+        const suctionParam = parseFloat(paramSuction.value);
+
+        let phaseText = "Phase 1: Orb Emergence";
+        let statusText = "Orb blooming in screen center";
+        let notchState = "hidden"; // hidden | expanded | settled
+
+        let mascotX = cx;
+        let mascotY = cy;
+        let mascotScale = 1.0;
+        let mascotWave = 0;
+        let mascotOpacity = 0;
+
+        let orbRadius = 0;
+        let orbAlpha = 0;
+        let orbCenterX = cx;
+        let orbCenterY = cy;
+
+        let typewriterText = "";
+        let showCursor = false;
+
+        // ── Phase 1: 0.0s - 0.8s (Orb Emergence) ─────────────────────────────
+        if (t < 0.8) {
+          phaseText = "Phase 1: Orb Emergence";
+          statusText = "Distorted Arc fluid orb emerging & pulsating in center";
+          const p = seg(t, 0.0, 0.8);
+          orbRadius = lerp(10, 140, Ease.back(p));
+          orbAlpha = lerp(0, 0.95, Ease.out(p));
+        }
+
+        // ── Phase 2: 0.8s - 2.2s (Atmospheric Spread) ────────────────────────
+        else if (t < 2.2) {
+          phaseText = "Phase 2: Full-Screen Atmosphere";
+          statusText = "Orb expanding outward, overlaying desktop with Arc gradient glow";
+          const p = seg(t, 0.8, 2.2);
+          orbRadius = lerp(140, screenDiag * 1.8, Ease.out(p));
+          orbAlpha = lerp(0.95, 0.85, p);
+        }
+
+        // ── Phase 3: 2.2s - 3.4s (Mascot Center Wave) ────────────────────────
+        else if (t < 3.4) {
+          phaseText = "Phase 3: Mascot Center Wave";
+          statusText = "Mochi mascot appears in spotlight & waves hello";
+          orbRadius = screenDiag * 1.8;
+          orbAlpha = 0.85;
+
+          const pMascot = seg(t, 2.2, 2.6);
+          mascotOpacity = Ease.out(pMascot);
+          mascotWave = seg(t, 2.4, 3.3);
+        }
+
+        // ── Phase 4: 3.4s - 5.0s (Mascot Right + "Hey Cleo" Typewriter) ──────
+        else if (t < 5.0) {
+          phaseText = "Phase 4: Typewriter & Staging";
+          statusText = 'Mascot shifts right; "Hey Cleo" types out with audio clicks';
+          orbRadius = screenDiag * 1.8;
+          orbAlpha = 0.85;
+          mascotOpacity = 1.0;
+
+          // Mascot glides to the right
+          const pShift = seg(t, 3.4, 3.8);
+          mascotX = lerp(cx, cx + 180, Ease.inOut(pShift));
+          mascotWave = 0.3;
+
+          // Typewriter write-up
+          const fullText = "Hey Cleo!";
+          const pType = seg(t, 3.7, 4.6);
+          const charsCount = Math.floor(pType * fullText.length);
+          typewriterText = fullText.slice(0, charsCount);
+          showCursor = (Math.floor(t * 5) % 2 === 0);
+
+          if (charsCount > lastCharCount && t > 3.7) {
+            playKeystrokeClick();
+            lastCharCount = charsCount;
+          }
+        }
+
+        // ── Phase 5: 5.0s - 5.6s (Unwrite + Mascot Recenters) ─────────────────
+        else if (t < 5.6) {
+          phaseText = "Phase 5: Unwrite & Recenter";
+          statusText = 'Text un-types back; Mochi glides back to screen center';
+          orbRadius = screenDiag * 1.8;
+          orbAlpha = 0.85;
+          mascotOpacity = 1.0;
+
+          const pUnwrite = seg(t, 5.0, 5.45);
+          const fullText = "Hey Cleo!";
+          const charsCount = Math.floor((1 - pUnwrite) * fullText.length);
+          typewriterText = fullText.slice(0, charsCount);
+          showCursor = true;
+
+          const pRecenter = seg(t, 5.1, 5.55);
+          mascotX = lerp(cx + 180, cx, Ease.inOut(pRecenter));
+        }
+
+        // ── Phase 5B: 5.6s - 6.4s (Reverse Suction Collapse) ──────────────────
+        else if (t < 6.4) {
+          phaseText = "Phase 5B: Background Suction Collapse";
+          statusText = "Background gradients get sucked back into the mascot (desktop clears)";
+          mascotX = cx;
+          mascotY = cy;
+          mascotOpacity = 1.0;
+
+          const pSuction = seg(t, 5.6, 6.35) * suctionParam;
+          const pSuckClamped = Math.min(1.0, pSuction);
+
+          orbRadius = lerp(screenDiag * 1.8, 0, Ease.inOut(pSuckClamped));
+          orbAlpha = lerp(0.85, 0.0, Ease.inOut(pSuckClamped));
+          orbCenterX = cx;
+          orbCenterY = cy;
+
+          if (t >= 5.65 && !suctionSoundPlayed) {
+            playSuctionWhoosh();
+            suctionSoundPlayed = true;
+          }
+        }
+
+        // ── Phase 6: 6.4s - 7.0s (Mascot Flight to Top Bezel) ─────────────────
+        else if (t < 7.0) {
+          phaseText = "Phase 6: Upward Flight to Notch";
+          statusText = "Background 100% clean; mascot glides up to top notch position";
+          orbRadius = 0;
+          orbAlpha = 0; // 100% clear!
+
+          mascotOpacity = 1.0;
+          const pFlight = seg(t, 6.4, 7.0);
+          const easeFlight = Ease.inOut(pFlight);
+
+          mascotX = cx;
+          mascotY = lerp(cy, 75, easeFlight);
+          mascotScale = lerp(1.0, 0.58, easeFlight);
+        }
+
+        // ── Phase 7: 7.0s - 7.8s (Notch Hand-Off & Greeting Wave) ────────────
+        else {
+          phaseText = "Phase 7: Notch Opening & Greeting";
+          statusText = "Notch expands open; mascot performs Coucou greeting wave in notch";
+          orbRadius = 0;
+          orbAlpha = 0;
+
+          notchState = t < 7.6 ? "expanded" : "compact-settled";
+          mascotOpacity = 1.0;
+          mascotX = cx;
+          mascotY = 75;
+          mascotScale = 0.58;
+          mascotWave = t < 7.6 ? 1.0 : 0;
+
+          if (t >= 7.05 && !greetingChimePlayed) {
+            playChime([523.25, 659.25, 783.99, 1046.5]);
+            greetingChimePlayed = true;
+          }
+        }
+
+        // 1. Draw Fluid Orb
+        if (orbAlpha > 0.001) {
+          drawFluidOrb(ctx, orbCenterX, orbCenterY, orbRadius, t, wobbleParam, orbAlpha);
+        }
+
+        // 2. Draw Typewriter Typography (Left of Mascot)
+        if (typewriterText.length > 0) {
+          ctx.save();
+          ctx.font = "bold 56px system-ui, sans-serif";
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+
+          const textX = cx + 70;
+          const textY = cy;
+
+          // Render "Hey " in white
+          const heyPart = typewriterText.slice(0, 4);
+          const cleoPart = typewriterText.slice(4);
+
+          // Measure widths to position accurately
+          const fullMeasure = ctx.measureText(typewriterText);
+
+          ctx.fillStyle = "#f5f6f8";
+          ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+          ctx.shadowBlur = 20;
+
+          // Draw "Hey "
+          ctx.fillText(heyPart, textX - ctx.measureText(cleoPart).width, textY);
+
+          // Draw "Cleo!" with Liquid Glass Arc Gradient
+          if (cleoPart.length > 0) {
+            const cleoX = textX;
+            const gradText = ctx.createLinearGradient(textX - ctx.measureText(cleoPart).width, textY - 30, textX, textY + 30);
+            gradText.addColorStop(0, "#2e28d4");
+            gradText.addColorStop(0.5, "#ec4899");
+            gradText.addColorStop(1, "#fb7185");
+            ctx.fillStyle = gradText;
+            ctx.shadowColor = "rgba(236, 72, 153, 0.6)";
+            ctx.shadowBlur = 24;
+            ctx.fillText(cleoPart, cleoX, textY);
+          }
+
+          // Blinking cursor
+          if (showCursor) {
+            ctx.fillStyle = "#ec4899";
+            ctx.shadowBlur = 10;
+            ctx.fillRect(textX + 6, textY - 26, 4, 52);
+          }
+
+          ctx.restore();
+        }
+
+        // 3. Draw Mascot
+        drawMochiAvatar(ctx, mascotX, mascotY, mascotScale, mascotWave, mascotOpacity);
+
+        // Update Notch Preview DOM Element
+        notchPreview.className = notchState;
+
+        // Update HUD display
+        phaseLabel.textContent = phaseText;
+        statusDesc.textContent = statusText;
+        timeDisplay.textContent = t.toFixed(2) + "s";
+        scrubber.value = t;
+      }
+
+      // ── Main Animation Ticker ───────────────────────────────────────────────
+      function tick(now) {
+        const delta = (now - lastRafTime) / 1000;
+        lastRafTime = now;
+
+        if (isPlaying) {
+          currentTime += delta * playSpeed;
+          if (currentTime > TOTAL_DURATION) {
+            currentTime = TOTAL_DURATION;
+            isPlaying = false;
+            updatePlayButtonUI();
+          }
+        }
+
+        renderFrame(currentTime);
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      // ── User Controls & Interactions ────────────────────────────────────────
+      function updatePlayButtonUI() {
+        if (isPlaying) {
+          playIcon.textContent = "⏸";
+          playText.textContent = "Pause";
+          btnPlay.classList.add("active");
+        } else {
+          playIcon.textContent = "▶";
+          playText.textContent = "Play";
+          btnPlay.classList.remove("active");
+        }
+      }
+
+      btnPlay.addEventListener("click", () => {
+        getAudioContext();
+        if (currentTime >= TOTAL_DURATION) {
+          currentTime = 0;
+          resetSoundFlags();
+        }
+        isPlaying = !isPlaying;
+        updatePlayButtonUI();
+      });
+
+      btnRestart.addEventListener("click", () => {
+        getAudioContext();
+        currentTime = 0;
+        isPlaying = true;
+        resetSoundFlags();
+        updatePlayButtonUI();
+      });
+
+      btnPrev.addEventListener("click", () => {
+        currentTime = Math.max(0, currentTime - 0.1);
+        renderFrame(currentTime);
+      });
+
+      btnNext.addEventListener("click", () => {
+        currentTime = Math.min(TOTAL_DURATION, currentTime + 0.1);
+        renderFrame(currentTime);
+      });
+
+      scrubber.addEventListener("input", (e) => {
+        getAudioContext();
+        currentTime = parseFloat(e.target.value);
+        isPlaying = false;
+        updatePlayButtonUI();
+        renderFrame(currentTime);
+      });
+
+      // Speed selectors
+      document.querySelectorAll("[data-speed]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("[data-speed]").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          playSpeed = parseFloat(btn.dataset.speed);
+        });
+      });
+
+      // Sound toggle
+      btnSound.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        soundState.textContent = soundEnabled ? "ON" : "MUTED";
+        soundIcon.textContent = soundEnabled ? "🔊" : "🔇";
+        btnSound.classList.toggle("active", soundEnabled);
+        if (soundEnabled) getAudioContext();
+      });
+
+      // Sliders
+      paramWobble.addEventListener("input", (e) => {
+        valWobble.textContent = e.target.value;
+      });
+
+      paramSuction.addEventListener("input", (e) => {
+        valSuction.textContent = e.target.value + "x";
+      });
+
+      function resetSoundFlags() {
+        lastCharCount = 0;
+        suctionSoundPlayed = false;
+        greetingChimePlayed = false;
+      }
+
+      // Keyboard shortcuts
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space") {
+          e.preventDefault();
+          btnPlay.click();
+        } else if (e.code === "KeyR") {
+          btnRestart.click();
+        } else if (e.code === "ArrowLeft") {
+          btnPrev.click();
+        } else if (e.code === "ArrowRight") {
+          btnNext.click();
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -12,28 +12,33 @@ on:
 permissions:
   contents: write
 
-# Publishing is paused: Defender flags the unsigned installer as
-# Trojan:Win32/Wacatac.H!ml (false positive, reported to Microsoft). Tags still
-# build, to check the app compiles, but nothing is uploaded. Set this back to
-# 'true' once the installer is signed or the detection is cleared.
+# Publishing is on: Microsoft reviewed the Defender false positive
+# (Trojan:Win32/Wacatac.H!ml) and removed the detection. Before pushing a
+# windows-v* tag, run this workflow by hand and scan the artifacts with Defender:
+# a new unsigned build can still trip its machine-learning model. Set this to
+# 'false' to build tags without publishing.
 env:
-  PUBLISH: 'false'
+  PUBLISH: 'true'
 
 jobs:
   build:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: windows
+        working-directory: apps/desktop-windows
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 12
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: windows/package-lock.json
+          cache: pnpm
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -41,16 +46,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            windows/target
-          key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
+            apps/desktop-windows/target
+          key: windows-cargo-${{ hashFiles('apps/desktop-windows/src-tauri/Cargo.lock') }}
           restore-keys: windows-cargo-
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
-      # Three files carry the version and they drift silently. Publishing a
-      # "0.1.1" that installs a 0.1.0 is the kind of thing nobody notices until
-      # a bug report arrives against the wrong build.
       - name: Check the tag and every version agree
         if: startsWith(github.ref, 'refs/tags/windows-v')
         shell: pwsh
@@ -58,7 +60,7 @@ jobs:
           $tag  = "${{ github.ref_name }}" -replace '^windows-v', ''
           $conf = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
           $pkg  = (Get-Content package.json | ConvertFrom-Json).version
-          $cargo = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
           "tag=$tag tauri.conf=$conf package.json=$pkg Cargo.toml=$cargo"
           $bad = @()
           if ($tag -ne $conf)  { $bad += "tauri.conf.json says $conf" }
@@ -66,40 +68,37 @@ jobs:
           if ($tag -ne $cargo) { $bad += "Cargo.toml says $cargo" }
           if ($bad) { throw "tag says $tag but $($bad -join '; ')" }
 
-      # `npm run build` (run by tauri as beforeBuildCommand) builds coucou-hook
-      # first, which tauri.conf.json then bundles as a resource. `pack` then
-      # copies the installer out of target/ under its shipping name.
       - name: Build and pack the installer
         id: pack
         shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          npm run pack
+          pnpm run pack
           $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
           "version=$version" >> $env:GITHUB_OUTPUT
           Get-ChildItem release | Format-Table Name, Length
 
-      # Upload only on a manual run or when publishing a release.
-      # The repo is public, so artifacts are downloadable by any signed-in GitHub
-      # user; the condition keeps them off automatic tag builds while downloads
-      # are paused. retention-days: 3 limits exposure.
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
-          name: Coucou-Windows-setup
-          path: windows/release/Coucou-Windows-${{ steps.pack.outputs.version }}-setup.exe
+          name: HeyCleo-Windows-setup
+          path: apps/desktop-windows/release/HeyCleo-${{ steps.pack.outputs.version }}-setup.exe
           retention-days: 3
 
-      # The unsigned NSIS installer is what Defender false-positives on, so the
-      # bare binaries go up as well. hooks.rs already falls back to looking for
-      # coucou-hook.exe next to coucou.exe, which is exactly this layout, so the
-      # portable pair runs with working Claude Code hooks and no installer.
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
         with:
-          name: Coucou-Windows-portable
-          path: |
-            windows/target/release/coucou.exe
-            windows/target/release/coucou-hook.exe
+          name: HeyCleo-Windows-msi
+          path: apps/desktop-windows/release/HeyCleo-${{ steps.pack.outputs.version }}.msi
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' || env.PUBLISH == 'true'
+        with:
+          name: HeyCleo-Windows-portable
+          path: apps/desktop-windows/release/HeyCleo-${{ steps.pack.outputs.version }}.exe
           retention-days: 3
 
       - name: Publish the release
@@ -110,21 +109,27 @@ jobs:
         run: |
           $v = "${{ steps.pack.outputs.version }}"
           $notes = @"
-          Coucou for Windows $v — Mochi at the top of your screen.
+          HeyCleo for Windows $v — Intelligent on-screen AI companion.
 
-          Download ``Coucou-Windows-$v-setup.exe`` and run it. The installer is not
-          code-signed yet, so Windows SmartScreen shows a warning: click
-          **More info → Run anyway**.
+          Download ``HeyCleo-$v.msi`` (Windows Installer) or ``HeyCleo-$v-setup.exe``.
+          Automatic in-app updates are enabled for all future releases!
           "@
-          # --latest=false is not cosmetic: without it GitHub hands "Latest" to
-          # whichever release was published last, and the site's Download for Mac
-          # button points at /releases/latest. A Windows tag would silently send
-          # Mac users to the .exe. The macOS `v*` releases own that slot.
+          $assets = @(
+            "release/HeyCleo-$v-setup.exe",
+            "release/HeyCleo-$v.msi",
+            "release/HeyCleo-$v.exe"
+          )
+          if (Test-Path "release/HeyCleo-$v-setup.exe.sig") {
+            $assets += "release/HeyCleo-$v-setup.exe.sig"
+          }
+          if (Test-Path "release/latest.json") {
+            $assets += "release/latest.json"
+          }
           gh release create "${{ github.ref_name }}" `
-            "release/Coucou-Windows-$v-setup.exe" `
-            --title "Coucou for Windows $v" `
+            $assets `
+            --title "HeyCleo for Windows $v" `
             --notes $notes `
-            --latest=false
+            --latest=true
 
       - name: Update the rolling windows-latest release
         if: env.PUBLISH == 'true' && startsWith(github.ref, 'refs/tags/windows-v')
@@ -133,19 +138,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $v = "${{ steps.pack.outputs.version }}"
+          $assets = @(
+            "release/HeyCleo-setup.exe",
+            "release/HeyCleo.msi",
+            "release/HeyCleo.exe"
+          )
+          if (Test-Path "release/HeyCleo-setup.exe.sig") {
+            $assets += "release/HeyCleo-setup.exe.sig"
+          }
+          if (Test-Path "release/latest.json") {
+            $assets += "release/latest.json"
+          }
           $exists = gh release view windows-latest 2>$null
           if ($LASTEXITCODE -eq 0) {
-            # The tag has to follow the release, or windows-latest keeps pointing
-            # at the first commit it was ever created from and anyone building
-            # from it gets an old tree.
             git tag -f windows-latest "${{ github.sha }}"
             git push -f origin windows-latest
-            gh release edit windows-latest --title "Coucou for Windows (latest)" --notes "Always the newest Windows build — currently $v."
-            gh release upload windows-latest "release/Coucou-Windows-setup.exe" --clobber
+            gh release edit windows-latest --title "HeyCleo for Windows (latest)" --notes "Always the newest Windows build — currently $v."
+            gh release upload windows-latest $assets --clobber
           } else {
             gh release create windows-latest `
-              "release/Coucou-Windows-setup.exe" `
-              --title "Coucou for Windows (latest)" `
+              $assets `
+              --title "HeyCleo for Windows (latest)" `
               --notes "Always the newest Windows build — currently $v." `
               --latest=false
           }

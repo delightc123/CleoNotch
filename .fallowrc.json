@@ -1,0 +1,28 @@
+{
+  "entry": [
+    "apps/desktop-windows/src/main.ts",
+    "apps/desktop-windows/src/settings/main.ts",
+    "apps/desktop-windows/src/desktop/main.ts",
+    "apps/desktop-windows/tests/**/*.mjs",
+    "apps/landing/app/**/*.{ts,tsx}"
+  ],
+  "ignorePatterns": [
+    "apps/desktop-windows/dev/**",
+    "apps/desktop-linux/**",
+    "apps/desktop-mac/**",
+    "apps/docs/**",
+    "apps/landing/public/**",
+    "design/**",
+    "scripts/**",
+    "**/dist/**",
+    "**/target/**",
+    "**/.next/**"
+  ],
+  "rules": {
+    "unused-files": "error",
+    "unused-exports": "warn",
+    "unused-types": "warn",
+    "unused-class-members": "warn",
+    "duplicate-exports": "warn"
+  }
+}

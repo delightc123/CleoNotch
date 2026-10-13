@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --bg: #0e0f12;
+  --card: #141518;
+  --ink: #f5f6f8;
+  --dim: #9398a1;
+  --line: #26282e;
+  --cleo-bg: #0e0f12;
+  --cleo-card: rgba(18, 19, 24, 0.82);
+  --cleo-border: rgba(255, 255, 255, 0.10);
+  --cleo-specular: rgba(255, 255, 255, 0.25);
+  --cleo-text-ink: #f5f6f8;
+  --cleo-text-dim: #9398a1;
+}
+
+html,
+body {
+  background-color: var(--cleo-bg);
+  color: var(--cleo-text-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  min-height: 100dvh;
+  height: auto;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (min-width: 640px) and (min-height: 521px) {
+  html,
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 639px), (max-height: 520px) {
+  html,
+  body {
+    min-height: 100dvh;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}

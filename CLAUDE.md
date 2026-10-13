@@ -1,30 +1,31 @@
-# Coucou — guide for AI coding agents
+# Cleo (CleoNotch) — Guide for AI Coding Agents
 
-Coucou is a native macOS app (`NotchBuddy/`); `windows/` is the Tauri version for Windows and Linux. Mochi, a small animated character living in the MacBook notch, shows AI coding agent sessions (Claude Code, Gemini CLI, Antigravity and more) and a few integrations, and lets the user approve, answer, chat and drop files from the notch.
+Cleo (CleoNotch) is an ambient AI desktop companion and productivity HUD created by Delight Chukwu, built upon the upstream Coucou architecture by Louis Raillé. It features dual native engines: a pure Swift 6 macOS notch HUD (`apps/desktop-mac/`) and a Tauri v2 + Rust HUD for Windows and Linux (`apps/desktop-windows/`). Mochi, an animated companion living in your notch, visualizes AI coding agent sessions (Claude Code, Gemini CLI, Antigravity, Cursor, Codex) and system integrations, enabling one-click approvals, terminal answers, chat, and file drops.
 
-## Where things are
-- `NotchBuddy/Sources/App/` — all Swift code. `NotchBuddy/Resources/sounds/` — the 28 WAV sounds. `NotchBuddy/project.yml` — XcodeGen project (never edit the `.xcodeproj` by hand).
-- `NotchBuddy/Sources/App/PillCatalog.swift` — single source of truth for all declared pills (workspace tools, agents, AI providers, services). Every pill ID, color, category and subtitle lives here.
-- `docs/SPEC.md`, `docs/INTEGRATIONS.md` — behaviour, views, states, integrations (in French).
-- `design/prototype/notch-buddy.html` — original prototype, the visual source of truth. `design/captures/` — target screenshots.
-- `windows/` — the Tauri app for Windows and Linux: Rust in `src-tauri/`, TypeScript in `src/`, the `coucou-hook` relay in `hook/`. `windows/README.md` lists what differs from the Mac.
-- `docs/*.html` — the GitHub Pages site (privacy, terms, support, legal notice).
+## Monorepo Architecture & Directory Layout
+- `apps/desktop-mac/` — Native macOS Swift 6 app (AppKit + SwiftUI Canvas timeline rendering). `Sources/App/` (Mac-only HUD), `Sources/CoucouKit/` (shared Mochi engine, wardrobe outfits, pills, diff parser, models). XcodeGen configured via `apps/desktop-mac/project.yml`.
+- `apps/desktop-windows/` — Unified Windows & Linux Tauri v2 engine: Rust backend in `src-tauri/`, TypeScript UI & Canvas 2D in `src/`, and the local agent hook relay (`cleo-hook` / `coucou-hook`) in `hook/`.
+- `apps/landing/` — Next.js 16 + React 19 interactive browser simulator with Arc-inspired fluid canvas, live Mochi canvas, and sound synth.
+- `apps/relay/` — Stateless Cloudflare Worker push relay for remote mobile notifications.
+- `apps/docs/` — Public site documents and disclosures (privacy, terms, legal notice).
+- `scripts/` — Turnkey release, outfit rendering, and upstream sync automation (`sync-coucou.mjs`).
+- `tests/` — Swift test suites verifying screen geometry, diff engine, and pill palette consistency.
 
-## Build
-```
-cd NotchBuddy && xcodegen && xcodebuild -scheme NotchBuddy -configuration Debug build
-```
-Windows and Linux: `cd windows && npm install && npm run tauri dev`
+## Local Development & Build Commands
+- **Root Workspace Commands (PNPM)**:
+  - Run Windows/Linux desktop HUD in dev mode: `pnpm dev:desktop`
+  - Run Windows UI in rapid browser mode: `pnpm dev`
+  - Run Next.js interactive landing preview: `pnpm dev:landing`
+  - Run unit test suite (367 unit tests): `pnpm test`
+  - Build Windows production release installer: `pnpm pack:windows`
+- **macOS Native Build**:
+  ```bash
+  cd apps/desktop-mac && xcodegen && xcodebuild -scheme NotchBuddy -configuration Debug build
+  ```
 
-## Rules
-- Swift 6, SwiftUI + AppKit. No third-party dependencies unless truly unavoidable. The character is drawn in code (`Canvas` + `TimelineView`), no Rive/Lottie/images.
-- Secrets live in the Keychain, never on disk or in git.
-- No telemetry. Network calls only to services the user configured.
-- Never block Claude Code: if the app doesn't answer, the hook exits immediately.
-- Never overwrite `~/.claude/settings.json`: dated backup, merge, show the diff, write only after the user confirms.
-- Never send an email or approve a Claude Code or Codex permission without an explicit click.
-- Performance: 0 % CPU when the island is hidden.
-- Keep the bundle identifier `fr.louisraille.NotchBuddy` (Keychain items, preferences and permissions depend on it).
-- Never restyle what already ships (pills, cards, Settings, chat…): existing views stay exactly as they are in `main`, which is the App Store build. Change the look of an existing view only when explicitly asked.
-- Pill IDs are stable contract values (Keychain, UserDefaults, hook routing): never rename an existing pill ID.
-- New views follow the existing app style. `design/prototype/notch-buddy.html` and `design/captures/` are references for new work, not a reason to change existing views.
+## Invariants & Rules of the House
+- **Swift Concurrency**: Swift 6 with `-strict-concurrency=complete`. Pure SwiftUI + AppKit. Zero third-party dependencies on macOS.
+- **BYOK Privacy & Security**: User API secrets strictly live inside native OS vaults (macOS Keychain, Windows Credential Manager). Never write unencrypted credentials to disk or transmit telemetry.
+- **Fail-Safe Hooks**: If the desktop HUD is not running or socket/pipe connections fail, agent hook relays (`cleo-hook.exe`, `coucou-hook.exe`) must exit cleanly with status code 0 so external agent processes are never stalled.
+- **Bundle Identifiers**: macOS bundle ID is `com.delight.CleoNotch`; Windows identifier is `com.delight.cleonotch`.
+- **Identity & Provenance**: Author and project maintainer is Delight Chukwu ([@delightc123](https://github.com/delightc123)). Upstream Coucou provenance is preserved in `.context/coucou/` and `LICENSE-ASSETS.md`.

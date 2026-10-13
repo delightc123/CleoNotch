@@ -1,39 +1,42 @@
-# Contributing to Coucou
+# Contributing to Cleo (CleoNotch)
 
-Thanks for wanting to help Mochi grow up! 🫶
+Thanks for wanting to help Cleo & Mochi grow! 🫶
 
-## Getting started
+## Getting Started
 
+### macOS Native Development
 ```bash
 brew install xcodegen
-cd NotchBuddy && xcodegen && open NotchBuddy.xcodeproj
+cd apps/desktop-mac && xcodegen && open NotchBuddy.xcodeproj
 ```
-
-Never edit `NotchBuddy.xcodeproj` by hand: change `project.yml` and run `xcodegen`.
+*Never edit `NotchBuddy.xcodeproj` directly: change `apps/desktop-mac/project.yml` and run `xcodegen`.*
 
 Check resting island dimensions on screens with and without a notch:
-
 ```bash
 bash scripts/test-screen-geometry.sh
+bash scripts/test-display-choice.sh
 ```
 
-## Good first contributions
+### Windows & Linux Development
+```bash
+pnpm install
+pnpm dev:desktop     # Launch native desktop HUD in Tauri dev mode
+pnpm dev             # Rapid in-browser UI testing
+pnpm test            # Run 367 unit tests
+```
 
-- A new service integration (a poller + an entry in `PillCatalog.swift` in the `.service` category + a detail card). Look at `StripePoller.swift` for a compact example.
-- A new agent: any agent already gets its own automatic pill by sending `coucou_agent` in its hook payload (see `docs/AGENTS.md`). Add an entry in `PillCatalog.swift` in the `.agent` or `.workspace` category only if you want it to be declarable in Settings → Active pills.
-- A new emote or sound for Mochi.
-- Bug fixes — please describe how to reproduce.
+## Good First Contributions
+- A new service integration (a poller + an entry in `PillCatalog.swift` or `integrations.ts` + a detail card).
+- A new AI agent integration: any agent automatically receives a pill by sending `coucou_agent` or `cleo_agent` in its hook payload.
+- A new emote, sound, or outfit wardrobe asset for Mochi.
+- Bug fixes — please include tests and reproduction steps.
 
-## Rules of the house
+## Rules of the House
+- **Pure Swift 6 & Tauri v2**: Zero third-party dependencies on macOS. Native Win32 / Linux Wayland windowing on Tauri.
+- **Strict Privacy**: Secrets belong in the OS vault (Keychain, Windows Credential Manager), never in unencrypted files or Git.
+- **Fail-Safe Relay**: External agent processes (Claude Code, Cursor, Codex) must never be blocked if the HUD is offline.
+- **Performance Invariant**: 0% CPU consumption when the island is minimized or idle.
 
-- Swift 6, SwiftUI + AppKit, **no third-party dependencies** unless there's really no other way.
-- Secrets go in the Keychain, never on disk or in git.
-- No telemetry, no network calls except to services the user configured.
-- Never block Claude Code: if the app doesn't answer, the hook must exit right away.
-- Never write `~/.claude/settings.json` without a backup and the user's confirmation.
-- Keep it light: 0 % CPU when the island is hidden.
-
-## Pull requests
-
-- One topic per PR, with a short GIF or screenshot for anything visual.
-- Build must pass with no new warnings.
+## Pull Requests
+- Keep PRs focused to a single feature or bugfix.
+- All workspace tests (`pnpm test` and `xcodebuild`) must pass with zero new warnings.

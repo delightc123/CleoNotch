@@ -1,16 +1,22 @@
-# Build artefacts
+# macOS / Xcode Build Artefacts
 NotchBuddy/build/
 NotchBuddy/NotchBuddy.xcodeproj/project.xcworkspace/xcuserdata/
 NotchBuddy/NotchBuddy.xcodeproj/xcuserdata/
+NotchBuddy/NotchBuddy.xcodeproj/xcshareddata/
+apps/desktop-mac/build/
+apps/desktop-mac/NotchBuddy.xcodeproj/project.xcworkspace/xcuserdata/
+apps/desktop-mac/NotchBuddy.xcodeproj/xcuserdata/
+apps/desktop-mac/NotchBuddy.xcodeproj/xcshareddata/
 *.xcuserstate
 
 # Xcode DerivedData (outside repo — listed for clarity)
 DerivedData/
 
-# macOS
+# OS temporary files
 .DS_Store
 .AppleDouble
 .LSOverride
+Thumbs.db
 
 # iCloud stubs
 *.icloud
@@ -19,14 +25,31 @@ DerivedData/
 .claude/
 _prive/
 
-# Rust & Node Build Artifacts
+# Monorepo Build Outputs & Package Caches
 target/
+**/target/
 node_modules/
+**/node_modules/
 dist/
+**/dist/
+.next/
+**/.next/
+out/
+**/out/
+.turbo/
+**/.turbo/
+.vercel/
+**/.vercel/
+*.tsbuildinfo
+apps/desktop-windows/release/
+apps/relay/.wrangler/
 
 # Private Agent Firewall
 /.context/
 /memory.md
 /.memory/
+/design.md
+/.design/
 /AGENTS.md
 /.rules/
+/.myFiles/

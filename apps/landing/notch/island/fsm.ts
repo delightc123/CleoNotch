@@ -1,0 +1,261 @@
+// Island open/close FSM — port of IslandStateMachine.swift.
+// No DOM, no Tauri: it only reports transitions.
+
+export type FsmState = "hidden" | "petit" | "home" | "coucou";
+
+export class IslandStateMachine {
+  state: FsmState = "hidden";
+
+  onTransition: ((from: FsmState, to: FsmState) => void) | null = null;
+
+  /**
+   * home → petit delay, seconds: the auto-close preference. Changing it while a
+   * countdown runs starts that countdown again with the new delay, so an edit in
+   * Settings applies at once (IslandStateMachine.homeToPetitDelay on macOS).
+   */
+  get homeToPetitDelay(): number {
+    return this.homeDelay;
+  }
+  set homeToPetitDelay(seconds: number) {
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds === this.homeDelay) return;
+    this.homeDelay = seconds;
+    if (this.state === "home" && this.homeCollapse != null) this.scheduleHomeCollapse();
+  }
+  /** petit → hidden delay, seconds. */
+  get petitToHiddenDelay(): number {
+    return this.petitHideDelay;
+  }
+  set petitToHiddenDelay(sec: number) {
+    if (!Number.isFinite(sec) || sec <= 0 || sec === this.petitHideDelay) return;
+    this.petitHideDelay = sec;
+    if (this.state === "petit" && this.petitHide != null) this.schedulePetitHide();
+  }
+  /** Keep minimized notch permanently visible on screen (never hides to wake strip). */
+  private persistentMinimized = true;
+  get isPersistentMinimized(): boolean {
+    return this.persistentMinimized;
+  }
+  set isPersistentMinimized(val: boolean) {
+    const changed = this.persistentMinimized !== val;
+    this.persistentMinimized = val;
+    if (val) {
+      this.clear("petitHide");
+      if (changed && this.state === "hidden") {
+        this.transition("petit");
+      }
+    } else if (this.state === "petit" && !this.pinned) {
+      this.schedulePetitHide();
+    }
+  }
+  /** coucou → petit once the greeting animation ends (no hover). */
+  greetAutoCollapseDelay = 0.6;
+  /** coucou → petit while the mouse hovers the greeting. */
+  greetHoverCollapseDelay = 10;
+  /** An alert waiting for an answer stays open, even when the mouse leaves. */
+  pinned = false;
+  /**
+   * Hovering opens the island all the way instead of peeking (Settings →
+   * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
+   */
+  openOnHover = false;
+  /** Grace period after the pointer leaves a hover-opened island, seconds. */
+  get hoverCloseDelay(): number {
+    return this.hoverClose;
+  }
+  set hoverCloseDelay(sec: number) {
+    if (!Number.isFinite(sec) || sec <= 0 || sec === this.hoverClose) return;
+    this.hoverClose = sec;
+    if (this.state === "home" && this.byHover && this.homeCollapse != null) this.scheduleHomeCollapse();
+  }
+  /** Open because of a hover, until the user clicks inside it. */
+  get openedByHover(): boolean {
+    return this.byHover;
+  }
+
+  /** Whether the launch entrance greeting animation is actively playing. */
+  greetingPlaying = false;
+
+  /**
+   * When the open island will fold, on the performance.now() clock, while the
+   * mouse-leave countdown runs; null otherwise. The island draws its countdown
+   * bar from it.
+   */
+  homeCollapseDueAt: number | null = null;
+
+  private homeDelay = 15;
+  private petitHideDelay = 60;
+  private hoverClose = 1.0;
+  private byHover = false;
+  private petitHide: number | null = null;
+  private homeCollapse: number | null = null;
+  private greetCollapse: number | null = null;
+
+  // ── Inputs ──────────────────────────────────────────────────────────────────
+
+  launch() {
+    this.cancelTimers();
+    this.greetingPlaying = true;
+    this.transition("coucou");
+  }
+
+  mouseEntered() {
+    if (this.openOnHover && (this.state === "hidden" || this.state === "petit") && !this.pinned) {
+      this.cancelTimers();
+      this.byHover = true;
+      this.transition("home");
+      return;
+    }
+    switch (this.state) {
+      case "hidden":
+        this.cancelTimers();
+        this.transition("petit");
+        break;
+      case "petit":
+        this.clear("petitHide");
+        break;
+      case "home":
+        this.clear("homeCollapse");
+        break;
+      case "coucou":
+        this.scheduleGreetCollapse(this.greetHoverCollapseDelay);
+        break;
+    }
+  }
+
+  mouseLeft() {
+    switch (this.state) {
+      case "hidden":
+        break;
+      case "petit":
+        this.schedulePetitHide();
+        break;
+      case "home":
+        this.scheduleHomeCollapse();
+        break;
+      case "coucou":
+        // While the entrance greeting animation is actively playing, ignore mouse-leave
+        // so the full wave animation and greeting melody complete without being cut off.
+        // Clear any hover hold timer so that once greetComplete fires, it collapses on normal 0.6s delay.
+        this.clear("greetCollapse");
+        if (this.greetingPlaying) {
+          break;
+        }
+        this.transition("petit");
+        break;
+    }
+  }
+
+  click() {
+    this.byHover = false;
+    if (this.state !== "petit") return;
+    this.cancelTimers();
+    this.transition("home");
+  }
+
+  /** Greeting animation finished (T.end). Doesn't override a running hover timer. */
+  greetComplete() {
+    this.greetingPlaying = false;
+    if (this.state !== "coucou") return;
+    if (this.greetCollapse == null) this.scheduleGreetCollapse(this.greetAutoCollapseDelay);
+  }
+
+  /** Non-alert work event: show compact from hidden. */
+  reveal() {
+    if (this.state !== "hidden") return;
+    this.cancelTimers();
+    this.transition("petit");
+    this.schedulePetitHide();
+  }
+
+  /**
+   * The user clicked inside the island: a hover-opened island now stays like
+   * any open island (normal auto-close) instead of folding once the pointer leaves.
+   */
+  userInteracted() {
+    if (!this.byHover) return;
+    this.byHover = false;
+    // The short countdown already running becomes the normal one.
+    if (this.state === "home" && this.homeCollapse != null) this.scheduleHomeCollapse();
+  }
+
+  /** Alert or explicit request: open straight to expanded. */
+  forceHome() {
+    this.greetingPlaying = false;
+    this.byHover = false;
+    this.cancelTimers();
+    this.transition("home");
+  }
+
+  /// Explicit close (OK button, Escape, an alert being answered).
+  forcePetit() {
+    this.greetingPlaying = false;
+    this.byHover = false;
+    this.cancelTimers();
+    this.transition("petit");
+  }
+
+  forceHidden() {
+    this.greetingPlaying = false;
+    this.byHover = false;
+    this.cancelTimers();
+    this.transition("hidden");
+  }
+
+  // ── Timers ──────────────────────────────────────────────────────────────────
+
+  private schedulePetitHide() {
+    this.clear("petitHide");
+    // A card folded away while it waits for an answer keeps the compact island
+    // on screen, so it can be reopened (isHeldOpen on macOS).
+    // If persistentMinimized is enabled, the compact notch stays forever.
+    if (this.pinned || this.persistentMinimized) return;
+    this.petitHide = window.setTimeout(() => {
+      this.petitHide = null;
+      if (this.state === "petit" && !this.pinned && !this.persistentMinimized) this.transition("hidden");
+    }, this.petitToHiddenDelay * 1000);
+  }
+
+  private scheduleHomeCollapse() {
+    this.clear("homeCollapse");
+    if (this.pinned) return;
+    const ms = (this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
+    this.homeCollapseDueAt = performance.now() + ms;
+    this.homeCollapse = window.setTimeout(() => {
+      this.homeCollapse = null;
+      this.homeCollapseDueAt = null;
+      // An alert pinned while the countdown ran keeps the island open.
+      if (this.state === "home" && !this.pinned) {
+        this.byHover = false;
+        this.transition("petit");
+      }
+    }, ms);
+  }
+
+  private scheduleGreetCollapse(delay: number) {
+    this.clear("greetCollapse");
+    this.greetCollapse = window.setTimeout(() => {
+      this.greetCollapse = null;
+      if (this.state === "coucou") this.transition("petit");
+    }, delay * 1000);
+  }
+
+  private clear(which: "petitHide" | "homeCollapse" | "greetCollapse") {
+    const id = this[which];
+    if (id != null) window.clearTimeout(id);
+    this[which] = null;
+    if (which === "homeCollapse") this.homeCollapseDueAt = null;
+  }
+
+  cancelTimers() {
+    this.clear("petitHide");
+    this.clear("homeCollapse");
+    this.clear("greetCollapse");
+  }
+
+  private transition(next: FsmState) {
+    if (next === this.state) return;
+    const from = this.state;
+    this.state = next;
+    this.onTransition?.(from, next);
+  }
+}

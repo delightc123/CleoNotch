@@ -1,0 +1,63 @@
+name: Windows CI
+
+# Type-checks and tests the Windows app on every pull request that touches it.
+# Nothing is packed and nothing is published: releases stay in windows.yml,
+# which only runs on tags.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop-windows/**'
+      - '.github/workflows/windows-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop-windows/**'
+      - '.github/workflows/windows-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/desktop-windows
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop-windows/target
+          key: windows-ci-cargo-${{ hashFiles('apps/desktop-windows/src-tauri/Cargo.lock') }}
+          restore-keys: windows-ci-cargo-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Type check and build UI
+        run: pnpm run build
+
+      - name: Island tests
+        run: pnpm test
+
+      - name: Rust check
+        run: cargo check --manifest-path src-tauri/Cargo.toml

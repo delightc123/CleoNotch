@@ -1,0 +1,22 @@
+{
+  "name": "cleonotch-monorepo",
+  "private": true,
+  "version": "0.3.0",
+  "author": "Delight Chukwu",
+  "packageManager": "pnpm@12.10.1",
+  "scripts": {
+    "dev": "pnpm --filter cleonotch-windows dev",
+    "dev:desktop": "pnpm --filter cleonotch-windows tauri dev",
+    "dev:windows": "pnpm --filter cleonotch-windows dev",
+    "dev:ui": "pnpm --filter cleonotch-windows dev:ui",
+    "dev:landing": "pnpm --filter cleo-landing dev",
+    "build": "pnpm --filter cleonotch-windows build",
+    "build:desktop": "pnpm --filter cleonotch-windows tauri build",
+    "pack:windows": "node apps/desktop-windows/scripts/pack.mjs",
+    "build:landing": "pnpm --filter cleo-landing build",
+    "test": "pnpm --filter cleonotch-windows test"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.8"
+  }
+}

@@ -5,16 +5,16 @@
 #   ./scripts/release.sh 0.1.2 --finish   finish after an interrupted notarization wait
 #
 # Run it from a clean checkout of main. CFBundleShortVersionString in
-# NotchBuddy/project.yml must match the version, and CHANGELOG.md needs a
+# apps/desktop-mac/project.yml must match the version, and CHANGELOG.md needs a
 # "## <version>" section: it becomes the release notes.
 set -euo pipefail
 
 VERSION="${1:?Usage: $0 <version> [--finish]}"
 MODE="${2:-}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="/tmp/coucou-release-$VERSION"
-APP="$BUILD_DIR/Coucou.app"
-ZIP="$BUILD_DIR/Coucou.zip"
+BUILD_DIR="/tmp/heycleo-release-$VERSION"
+APP="$BUILD_DIR/HeyCleo.app"
+ZIP="$BUILD_DIR/HeyCleo.zip"
 COMMIT_FILE="$BUILD_DIR/commit"
 TAG="v$VERSION"
 
@@ -42,6 +42,8 @@ CHANGES=$(awk -v head="## $VERSION" '
 ' CHANGELOG.md)
 [ -n "$CHANGES" ] || die "CHANGELOG.md has no '## $VERSION' section"
 
+grep -q "| \[$VERSION\]" README.md || die "README.md has no row for $VERSION in the Versions table"
+
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   die "tag $TAG already exists here"
 fi
@@ -62,11 +64,32 @@ if [ "$MODE" != "--finish" ]; then
   [ -n "$IDENTITY" ] || die "no 'Developer ID Application' certificate found. Install it via Xcode → Settings → Accounts."
   echo "Signing with: $IDENTITY"
 
+  # ── 1b. Developer ID provisioning profile (iCloud for the iPhone sync) ──────
+  PROFILE_NAME="Coucou Developer ID"
+  PROFILE_FOUND=""
+  TMP_PLIST=$(mktemp)
+  for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+    [ -d "$dir" ] || continue
+    for f in "$dir"/*.provisionprofile; do
+      [ -f "$f" ] || continue
+      security cms -D -i "$f" > "$TMP_PLIST" 2>/dev/null || continue
+      [ "$(/usr/libexec/PlistBuddy -c "Print :Name" "$TMP_PLIST" 2>/dev/null || true)" = "$PROFILE_NAME" ] || continue
+      PROFILE_FOUND="$f"
+      break 2
+    done
+  done
+  [ -n "$PROFILE_FOUND" ] || { rm -f "$TMP_PLIST"; die "no provisioning profile named '$PROFILE_NAME'. developer.apple.com → Profiles → Developer ID (Mac) for fr.louisraille.NotchBuddy, then copy it to ~/Library/Developer/Xcode/UserData/Provisioning Profiles/"; }
+  EXPIRY=$(/usr/libexec/PlistBuddy -c "Print :ExpirationDate" "$TMP_PLIST")
+  rm -f "$TMP_PLIST"
+  echo "Profile: $PROFILE_FOUND (expires $EXPIRY)"
+
   # ── 2. xcodegen + Release build ─────────────────────────────────────────────
-  cd "$REPO_ROOT/NotchBuddy"
+  cd "$REPO_ROOT/apps/desktop-mac"
+  PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist 2>/dev/null || true)
+  [ "$PLIST_VERSION" = "$VERSION" ] || die "apps/desktop-mac/Resources/Info.plist is version $PLIST_VERSION, not $VERSION: run xcodegen and commit Info.plist"
   xcodegen generate
   PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Resources/Info.plist)
-  [ "$PLIST_VERSION" = "$VERSION" ] || die "the app is version $PLIST_VERSION, not $VERSION: update CFBundleShortVersionString in NotchBuddy/project.yml"
+  [ "$PLIST_VERSION" = "$VERSION" ] || die "project.yml says $PLIST_VERSION, not $VERSION: update CFBundleShortVersionString in apps/desktop-mac/project.yml"
 
   rm -rf "$BUILD_DIR" && mkdir -p "$BUILD_DIR"
   echo "$COMMIT" > "$COMMIT_FILE"
@@ -80,6 +103,10 @@ if [ "$MODE" != "--finish" ]; then
     CODE_SIGNING_REQUIRED=YES \
     CODE_SIGNING_ALLOWED=YES \
     CONFIGURATION_BUILD_DIR="$BUILD_DIR"
+
+  [ -f "$APP/Contents/embedded.provisionprofile" ] || die "the provisioning profile was not embedded in the app"
+  codesign -d --entitlements - --xml "$APP" 2>/dev/null | grep -q "iCloud.fr.louisraille.Coucou" \
+    || die "the app is not signed with the iCloud entitlements"
 
   # ── 3. Zip + notarize ───────────────────────────────────────────────────────
   ditto -c -k --keepParent "$APP" "$ZIP"
@@ -117,11 +144,11 @@ $CHANGES
 
 ## Install
 
-1. Download Coucou.zip below and unzip it.
-2. Move Coucou.app to your Applications folder, replacing the old one if you have it.
+1. Download HeyCleo.zip below and unzip it (or download HeyCleo.dmg).
+2. Move HeyCleo.app to your Applications folder, replacing the old one if you have it.
 3. Launch it, and click Open when macOS asks you to confirm.
 
-Linux and Windows: see the [README](https://github.com/Louis-CFM/coucou#readme)."
+Linux and Windows: see the [README](https://github.com/delightc123/CleoNotch#readme)."
 
 echo
 echo "──────── Release notes ────────"
@@ -138,9 +165,9 @@ git tag "$TAG" "$COMMIT"
 git push origin "$TAG"
 
 gh release create "$TAG" "$ZIP" \
-  --repo Louis-CFM/coucou \
-  --title "Coucou $VERSION" \
+  --repo delightc123/CleoNotch \
+  --title "HeyCleo $VERSION" \
   --latest \
   --notes "$NOTES"
 
-echo "✓ $TAG released: https://github.com/Louis-CFM/coucou/releases/tag/$TAG"
+echo "✓ $TAG released: https://github.com/delightc123/CleoNotch/releases/tag/$TAG"
