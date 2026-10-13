@@ -7,7 +7,7 @@ import { Sound } from "@/notch/core/sound";
 
 const GITHUB_REPO = "delightc123/CleoNotch";
 const DEFAULT_MAC_URL = `https://github.com/${GITHUB_REPO}/releases/download/v0.3.0/HeyCleo.dmg`;
-const DEFAULT_WINDOWS_URL = `https://github.com/${GITHUB_REPO}/releases/download/windows-latest/HeyCleo.exe`;
+const DEFAULT_WINDOWS_URL = `https://github.com/${GITHUB_REPO}/releases/download/v0.3.0/HeyCleo.exe`;
 
 const FULL_TITLE = "Hey Cleo!";
 
@@ -28,6 +28,34 @@ interface GitHubRelease {
   prerelease: boolean;
   assets?: GitHubAsset[];
 }
+
+const isMacAsset = (lower: string) =>
+  lower.endsWith(".dmg") || lower.endsWith(".pkg") || lower.includes("mac");
+
+const isWinAsset = (lower: string) =>
+  !lower.includes("hook") &&
+  (lower === "heycleo.exe" || lower.endsWith("-setup.exe") || lower.endsWith(".msi") || lower.endsWith(".exe"));
+
+const pickReleaseUrls = (releases: GitHubRelease[]) => {
+  let foundMac: string | null = null;
+  let foundWin: string | null = null;
+
+  for (const rel of releases) {
+    if (rel.draft) continue;
+    const assets = rel.assets ?? [];
+    const exactHeyCleo = assets.find((a) => a.name.toLowerCase() === "heycleo.exe");
+    if (!foundWin && exactHeyCleo) {
+      foundWin = exactHeyCleo.browser_download_url;
+    }
+    for (const asset of assets) {
+      const lower = asset.name.toLowerCase();
+      if (!foundMac && isMacAsset(lower)) foundMac = asset.browser_download_url;
+      if (!foundWin && isWinAsset(lower)) foundWin = asset.browser_download_url;
+    }
+    if (foundMac && foundWin) break;
+  }
+  return { foundMac, foundWin };
+};
 
 interface AnimatedIconHandle {
   startAnimation: () => void;
@@ -139,23 +167,7 @@ export function Hero({ isReady = true, onEntranceComplete }: HeroProps) {
         const releases = (await res.json()) as GitHubRelease[];
         if (cancelled || !Array.isArray(releases)) return;
 
-        let foundMac: string | null = null;
-        let foundWin: string | null = null;
-
-        for (const rel of releases) {
-          if (rel.draft) continue;
-          for (const asset of rel.assets ?? []) {
-            const lower = asset.name.toLowerCase();
-            if (!foundMac && (lower.endsWith(".dmg") || lower.endsWith(".pkg") || lower.includes("mac"))) {
-              foundMac = asset.browser_download_url;
-            }
-            if (!foundWin && (lower.endsWith(".msi") || lower.endsWith("-setup.exe") || lower.endsWith(".exe"))) {
-              foundWin = asset.browser_download_url;
-            }
-          }
-          if (foundMac && foundWin) break;
-        }
-
+        const { foundMac, foundWin } = pickReleaseUrls(releases);
         if (!cancelled) {
           if (foundMac) setMacUrl(foundMac);
           if (foundWin) setWindowsUrl(foundWin);
@@ -230,19 +242,19 @@ export function Hero({ isReady = true, onEntranceComplete }: HeroProps) {
         </h2>
       </motion.div>
 
-      {/* Download CTA Buttons — Sleeker Liquid Glassmorphic Pill Buttons */}
+      {/* Download CTA Buttons — Sleeker Liquid Glassmorphic Pill Buttons (Always side-by-side, compact on mobile) */}
       <motion.div
         initial={{ opacity: 0, y: 22 }}
         animate={isReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }}
         transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="flex flex-wrap items-center justify-center gap-3.5 sm:gap-4"
+        className="flex flex-nowrap items-center justify-center gap-2.5 sm:gap-4 max-w-full"
       >
-        {/* Mac: Light Frosted Liquid Glass Button with Arc Pink Glow */}
+        {/* Mac: Light Frosted Liquid Glass Button */}
         <a
           href={macUrl}
           onMouseEnter={() => macIconRef.current?.startAnimation()}
           onMouseLeave={() => macIconRef.current?.stopAnimation()}
-          className="group relative inline-flex items-center justify-center gap-2 h-[40px] px-6 rounded-full bg-white/70 hover:bg-white/85 text-[#0e0f12] outline-none overflow-hidden backdrop-blur-xl backdrop-saturate-150 border border-white/80 border-t-white shadow-[inset_0_1px_1px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.08),0_8px_20px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,1),0_12px_28px_rgba(236,72,153,0.3)] active:scale-95 transition-all duration-200 cursor-pointer select-none"
+          className="group relative inline-flex items-center justify-center gap-1.5 sm:gap-2 h-[36px] sm:h-[40px] px-3.5 sm:px-6 rounded-full bg-white/70 hover:bg-white/85 text-[#0e0f12] outline-none overflow-hidden backdrop-blur-xl backdrop-saturate-150 border border-white/80 border-t-white shadow-[inset_0_1px_1px_rgba(255,255,255,1),inset_0_-1px_1px_rgba(0,0,0,0.08),0_8px_20px_rgba(0,0,0,0.25)] active:scale-95 transition-all duration-200 cursor-pointer select-none"
         >
           {/* Top specular reflection curve */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[45%] rounded-t-full bg-gradient-to-b from-white/40 to-transparent" />
@@ -251,18 +263,18 @@ export function Hero({ isReady = true, onEntranceComplete }: HeroProps) {
             className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-full bg-gradient-to-r from-transparent via-white to-transparent"
           />
 
-          <span className="relative z-10 flex items-center justify-center gap-2 whitespace-nowrap text-[13.5px] font-semibold tracking-tight text-[#0e0f12]">
+          <span className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap text-[12px] sm:text-[13.5px] font-semibold tracking-tight text-[#0e0f12]">
             <AppleIcon ref={macIconRef} size={15} color="#0e0f12" />
             <span className="leading-none">Download for Mac</span>
           </span>
         </a>
 
-        {/* Windows: Dark Frosted Liquid Glass Button with Arc Blue Glow */}
+        {/* Windows: Dark Frosted Liquid Glass Button */}
         <a
           href={windowsUrl}
           onMouseEnter={() => winIconRef.current?.startAnimation()}
           onMouseLeave={() => winIconRef.current?.stopAnimation()}
-          className="group relative inline-flex items-center justify-center gap-2 h-[40px] px-6 rounded-full bg-black/40 hover:bg-black/55 text-[#f5f6f8] outline-none overflow-hidden backdrop-blur-xl backdrop-saturate-150 border border-white/20 hover:border-white/35 border-t-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-1px_1px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.55)] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),0_12px_28px_rgba(59,130,246,0.3)] active:scale-95 transition-all duration-200 cursor-pointer select-none"
+          className="group relative inline-flex items-center justify-center gap-1.5 sm:gap-2 h-[36px] sm:h-[40px] px-3.5 sm:px-6 rounded-full bg-black/40 hover:bg-black/55 text-[#f5f6f8] outline-none overflow-hidden backdrop-blur-xl backdrop-saturate-150 border border-white/20 hover:border-white/35 border-t-white/40 shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-1px_1px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.55)] active:scale-95 transition-all duration-200 cursor-pointer select-none"
         >
           {/* Top specular reflection curve */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[45%] rounded-t-full bg-gradient-to-b from-white/15 to-transparent" />
@@ -271,7 +283,7 @@ export function Hero({ isReady = true, onEntranceComplete }: HeroProps) {
             className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-full bg-gradient-to-r from-transparent via-white/50 to-transparent"
           />
 
-          <span className="relative z-10 flex items-center justify-center gap-2 whitespace-nowrap text-[13.5px] font-semibold tracking-tight text-[#f5f6f8]">
+          <span className="relative z-10 flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap text-[12px] sm:text-[13.5px] font-semibold tracking-tight text-[#f5f6f8]">
             <WindowsNewIcon ref={winIconRef} size={15} color="#f5f6f8" />
             <span className="leading-none">Download for Windows</span>
           </span>
