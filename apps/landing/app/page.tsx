@@ -38,11 +38,9 @@ export default function HomePage() {
       {/* Arc Ambient Mesh Glow Orbs (Behind Waves) */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         {/* Cool Cobalt/Indigo Glow (Top-Left) */}
-        <div className="absolute -top-[15%] -left-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#2E28D4]/40 blur-[130px]" />
+        <div className="absolute -top-[15%] -left-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#2E28D4]/18 blur-[140px]" />
         {/* Hot Magenta/Pink Glow (Bottom-Right) */}
-        <div className="absolute -bottom-[15%] -right-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#EC4899]/35 blur-[130px]" />
-        {/* Luminous Violet Midtone Bridge (Center) */}
-        <div className="absolute top-[35%] left-[25%] w-[45vw] h-[45vw] max-w-[650px] max-h-[650px] rounded-full bg-[#8B5CF6]/25 blur-[150px]" />
+        <div className="absolute -bottom-[15%] -right-[10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-[#EC4899]/15 blur-[140px]" />
       </div>
 
       {/* Background: WebGL2 GradientWaves tuned to Arc Brand Palette */}
@@ -51,23 +49,23 @@ export default function HomePage() {
           horizonColor="#2E28D4"
           waveColor="#EC4899"
           crestColor="#FB7185"
-          speed={0}
-          amplitude={2.2}
-          waveScale={0.6}
-          waveRatio={0.9}
-          swell={32}
-          turbulence={22}
+          speed={0.12}
+          amplitude={1.8}
+          waveScale={0.55}
+          waveRatio={0.85}
+          swell={22}
+          turbulence={12}
           tilt={1.11}
           zoom={1.0}
-          height={5.5}
-          fogDepth={15}
+          height={5.8}
+          fogDepth={16}
           detail="medium"
-          brightness={1.0}
-          opacity={1.0}
-          mouseInteraction={false}
-          parallaxStrength={0}
-          grain={false}
-          grainIntensity={0}
+          brightness={0.95}
+          opacity={0.9}
+          mouseInteraction={true}
+          parallaxStrength={0.25}
+          grain={true}
+          grainIntensity={0.025}
         />
       </div>
 
